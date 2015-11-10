@@ -1,0 +1,27 @@
+#!/bin/sh
+
+usage="Very fast copy over ssh, see: http://www.damtp.cam.ac.uk/user/ejb48/sshspeedtests.html\nusage:\n\n  $(basename $0) <SRC> <DEST_HOST> <DEST_DIR>\n"
+if [ -z "$1" ]; then
+	echo -e $usage
+	exit 0
+fi
+if [ -z "$2" ]; then
+	echo -e $usage
+	exit 0
+fi
+if [ -z "$3" ]; then
+	echo -e $usage
+	exit 0
+fi
+SRC=$1
+HOST=$2
+DEST=$3
+CPIPE=$(which cpipe 2>/dev/null)
+PV=$(which pv 2>/dev/null)
+if [ ! -z "$CPIPE" ]; then
+	tar -cf- "$SRC" | cpipe | ssh -o Compression=no -o Ciphers=arcfour128 -o MACs=umac-64@openssh.com "$HOST" tar -xf- -C '$DEST'
+elif [ ! -z "$PV" ]; then
+	tar -cf- "$SRC" | pv -C | ssh -o Compression=no -o Ciphers=arcfour128 -o MACs=umac-64@openssh.com "$HOST" tar -xf- -C '$DEST'
+else
+	time tar -cf- "$SRC" | ssh -o Compression=no -o Ciphers=arcfour128 -o MACs=umac-64@openssh.com "$HOST" tar -xf- -C '$DEST'
+fi

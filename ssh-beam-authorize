@@ -1,0 +1,12 @@
+#!/bin/sh
+
+DEST=$1
+if [ -z "$DEST" ]; then
+	echo "usage: $(basename $0) <UPLOADDIR> <PRIVATEKEYFILE>"
+	exit 0
+fi
+
+KEYFILE=${2:-~/.ssh/id_rsa}
+KEY=$(ssh-keygen -y -f $KEYFILE)
+
+echo command=\"tar --chroot -xf- -C \'$DEST\'\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,no-user-rc $KEY ssh-beam
