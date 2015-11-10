@@ -1,0 +1,137 @@
+#!/usr/bin/env python
+
+import os
+import pwd
+import logging
+from subprocess import call, check_output
+from argparse import ArgumentParser
+
+DEVNULL = open(os.devnull, 'wb')
+
+def get_username():
+    return pwd.getpwuid( os.getuid() )[ 0 ]
+
+
+def setfacl(path, user, mode, remove=False, recursive=False, default=False):
+	if user[0] == ':':
+		type = "group"
+		name = user[1:]
+	else:
+		type = "user"
+		name = user
+
+	arguments = ['setfacl']
+
+	if default:
+		arguments.append("-d")
+
+	if recursive:
+		arguments.append('-R')
+
+	if remove:
+		acl = "%s:%s" % (type, name)
+		action = "-x"
+	else:
+		acl = "%s:%s:%s" % (type, name, mode)
+		action = "-m"
+	arguments.append(action)
+	arguments.append(acl)
+	arguments.append(path)
+	print arguments
+	call(arguments, stderr=DEVNULL)
+
+
+def check_executable(path, user):
+	print "- make sure all parent paths can be entered by %s" % user
+	isfile = os.path.isfile(path)
+	if isfile:
+		p = os.path.dirname(path)
+	else:
+		p = path[:]
+
+	while p != "/":
+		setfacl(p, user, 'rX')
+		p = os.path.dirname(p)
+
+
+def share(path, users, write, execute, remove, recursive, default=False):
+	path = os.path.abspath(path)
+	path = os.path.realpath(path)
+	print "- share path: ", path
+
+	mode = "r"
+	if not os.path.isfile(path):
+		mode = mode + "X"
+	if write:
+		mode = mode + "w"
+	
+	if execute:
+		mode = mode + "x"
+
+	for user in users:
+		setfacl(path, user, mode, remove, recursive, default=default)
+		if not remove:
+			check_executable(path, user)
+
+
+def getfacl(path, users):
+	username = get_username()
+	o = check_output(['getfacl', '-p', '-t', path])
+	for line in o.splitlines():
+		if line.startswith('#'): continue
+		e = line.split()
+		if len(e) < 3: continue
+		role, name, mode = e
+		if name == username: continue
+		if users and len(users) > 0:
+			ingroups = role.lower() == "group" and ":"+name in users
+			inusers = role.lower() == "user" and name in users
+			if not ingroups and not inusers:
+				continue
+
+		print path, role, name, mode	
+
+
+def show(path, users):
+	path = os.path.abspath(path)
+	if os.path.isfile(path):
+		getfacl(path, users)
+	else:
+		for root, dirs, files in os.walk(path):
+			getfacl(root, users)
+			for file in files:
+				getfacl(os.path.join(root,file), users)
+		
+
+if __name__ == '__main__':
+	parser = ArgumentParser()
+	parser.add_argument('-s', '--show', dest='show', action='store_const',
+						const=True, default=False,
+						help='show shared files and folders')
+	parser.add_argument('-w', '--write', dest='write', action='store_const',
+						const=True, default=False,
+						help='add write access')
+	parser.add_argument('-e', '--remove', dest='remove', action='store_const',
+						const=True, default=False,
+						help='erase/remove access')
+	parser.add_argument('-x', '--executable', dest='execute', action='store_const',
+						const=True, default=False,
+						help='add executavle flag')
+	parser.add_argument('-r', '--recursive', dest='recursive', action='store_const',
+						const=True, default=False,
+						help='apply recursive to all files')
+	parser.add_argument('-d', '--default', dest='default', action='store_const',
+						const=True, default=False,
+						help='apply recursive to all files')
+	parser.add_argument('path', help='path to set permission')
+	parser.add_argument('users', help='user or groups to give access to, e.g. max or :users',
+						nargs='*')
+
+	args = parser.parse_args()
+	if isinstance(args.users, basestring):
+		args.users = [args.users]
+
+	if args.show:
+		show(args.path, args.users)
+	else:
+		share(args.path, args.users, args.write, args.execute, args.remove, args.recursive, default=args.default)

@@ -1,0 +1,18 @@
+#!/bin/bash
+
+exe=$1
+shift
+args=$@
+
+condor_submit <<EOF
+Executable     = $exe
+arguments      = $args
+Error   = \$(Cluster)-error.txt
+Output  = \$(Cluster)-output.txt
+Log     = \$(Cluster)-log.txt
+Notification = Error
+kill_sig = SIGTERM
++IsSuspensionJob = false
+getenv        = True
+Queue = 1
+EOF

@@ -1,0 +1,22 @@
+#!/usr/bin/env python
+
+import numpy
+import sys
+import gzip
+
+if sys.argv[1] == "-":
+	fin = sys.stdin
+elif sys.argv[1].endswith(".gz"):
+	fin = gzip.open(sys.argv[1], "rb")
+else:
+	fin = open(sys.argv[1], "rb")
+
+if sys.argv[2] == "-":
+	fout = sys.stdout
+elif sys.argv[2].endswith(".gz"):
+	fout = gzip.open(sys.argv[2], "wb")
+else:
+	fout = open(sys.argv[2], "wb")
+	
+d = numpy.genfromtxt(fin, names=True, unpack=True)
+numpy.save(fout, d)
