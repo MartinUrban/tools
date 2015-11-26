@@ -1,0 +1,59 @@
+#!/bin/bash 
+
+#This is a small script modifying page $2 such as it has double size with the right column empty for comments. It makes use of pdftk and pdfjam. The Outputfile may not be the same as the inputfile
+
+PDFPATH=$1
+PAGE=$2
+OUTFILE=$3
+
+function modifyPDF { 
+        PDFPATH=$1
+        PAGE=$2
+        OUTFILE=$3
+        #three alternatives for extracting the page which has to be edited and adding an empty page
+        #pdftk $PDFPATH cat $PAGE output /tmp/editpage.pdf 
+        #pdfjam /tmp/editpage.pdf '1,{}' --outfile /tmp/editpage.pdf
+        #pdfjam --quiet $PDFPATH "'$PAGE,{}'" --outfile /tmp/editpage.pdf
+        #pdfjam --quiet --landscape --nup 2x1 /tmp/editpage.pdf  --outfile /tmp/editpageA3.pdf
+        pdfjam --quiet --landscape --nup 2x1 $PDFPATH $PAGE,{} --outfile /tmp/editpageA3.pdf
+
+        NPAGES=$(pdftk $PDFPATH dump_data | /bin/grep -i NumberOfPages | sed 's/[^0-9]*//')
+
+        if [ $PAGE == "1" ]
+        then 
+                pdftk A=$PDFPATH B=/tmp/editpageA3.pdf cat B A2-end output $OUTFILE
+        elif [ $PAGE == $NPAGES ]
+        then
+                pdftk A=$PDFPATH B=/tmp/editpageA3.pdf cat A1-$(($NPAGES-1)) B output $OUTFILE
+        else
+                pdftk A=$PDFPATH B=/tmp/editpageA3.pdf cat "A1-$(($PAGE-1))" B "A$(($PAGE+1))-end" output $OUTFILE
+        fi
+
+        rm /tmp/editpageA3.pdf
+}
+
+function modifyAll {
+        PDFPATH=$1
+        OUTFILE=$2
+        PAGES=""
+        NPAGES=$(pdftk $PDFPATH dump_data | /bin/grep -i NumberOfPages | sed 's/[^0-9]*//')
+        for ((i=1; i<=$NPAGES; i++))
+        do
+                PAGES=${PAGES}"$i"",{},"
+        done
+        # Remove last character
+        PAGES=${PAGES%?}
+        pdfjam --quiet --landscape --nup 2x1 $PDFPATH $PAGES --outfile $OUTFILE
+}
+
+if [ -z "$OUTFILE" ]
+then
+        OUTFILE="comments.pdf"
+fi
+        
+if [ "$PAGE" = "all" ]
+then
+        modifyAll $PDFPATH $OUTFILE
+else
+        modifyPDF $PDFPATH $PAGE $OUTFILE
+fi
