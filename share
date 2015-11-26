@@ -81,7 +81,7 @@ def getfacl(path, users):
 		if line.startswith('#'): continue
 		e = line.split()
 		if len(e) < 3: continue
-		role, name, mode = e
+		role, name, mode = e[:3]
 		if name == username: continue
 		if users and len(users) > 0:
 			ingroups = role.lower() == "group" and ":"+name in users
